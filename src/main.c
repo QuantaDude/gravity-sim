@@ -23,8 +23,8 @@ int main() {
   float mass1 = 1000.0f;
   float mass2 = 100.0f;
 
-  Vector2 vel1 = {1.5f, 0.0f};
-  Vector2 vel2 = {0.0f, 1.5f};
+  Vector2 vel1 = {-1.5f, 0.0f};
+  Vector2 vel2 = {0.0f, -2.5f};
 
   Vector2 F21 = {0, 0};
 
@@ -36,7 +36,7 @@ int main() {
                      .rotation = 0.0f,
                      .target = {.x = 0.0f, .y = 0.0f}};
   // Create the Nuklear Context
-  int fontSize = 13;
+  int fontSize = 18;
   struct nk_context *ctx = InitNuklear(fontSize);
 
   SetTargetFPS(60);
@@ -53,18 +53,18 @@ int main() {
     Vector2 direction =
         Vector2Scale(displacementVect, 1.0f / Vector2Length(displacementVect));
 
-    Vector2 F21 = Vector2Scale(direction, forceMagnitude);
+    Vector2 F21 = Vector2Scale(direction, -forceMagnitude);
 
-    Vector2 a1 = Vector2Scale(F21, 1.0f / mass2);
-    Vector2 a2 = Vector2Scale(F21, -1.0f / mass1);
+    Vector2 a1 = Vector2Scale(F21, 1.0f / mass1);
+    Vector2 a2 = Vector2Scale(F21, -1.0f / mass2);
 
     float dt = GetFrameTime();
 
     vel1 = Vector2Add(vel1, Vector2Scale(a1, dt * timeScale));
     vel2 = Vector2Add(vel2, Vector2Scale(a2, dt * timeScale));
 
-    pos2 = Vector2Add(pos2, Vector2Scale(vel1, dt * timeScale));
-    pos1 = Vector2Add(pos1, Vector2Scale(vel2, dt * timeScale));
+    pos2 = Vector2Add(pos2, Vector2Scale(vel2, dt * timeScale));
+    pos1 = Vector2Add(pos1, Vector2Scale(vel1, dt * timeScale));
     // sprintf(FPSstring, "%d\0", GetFPS());
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
@@ -81,9 +81,9 @@ int main() {
 
     // Nuklear GUI Code
     // https://github.com/Immediate-Mode-UI/Nuklear/wiki/Window
-    if (nk_begin(ctx, "Nuklear", nk_rect(0, 0, 220, 1080),
+    if (nk_begin(ctx, "Nuklear", nk_rect(0, 0, 280, 1080),
                  NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_CLOSABLE)) {
-      nk_layout_row_static(ctx, 50, 220, 1);
+      nk_layout_row_static(ctx, 50, 280, 1);
       nk_label(ctx, "Time Scale", NK_TEXT_CENTERED);
       timeScale = nk_slide_float(ctx, 0.01f, timeScale, 200.0f, 5.0f);
       nk_property_float(ctx, "planet 1 mass", 0.00001f, &mass1, 100000000000.0f,
@@ -109,8 +109,8 @@ int main() {
     rlPopMatrix();
     DrawCircleV(pos1, 50.0f, RED);
     DrawCircleV(pos2, 50.0f, GREEN);
-    DrawText("planet 1", pos1.x, pos1.y - 70, 12.0f, RED);
-    DrawText("planet 2", pos2.x, pos2.y - 70, 12.0f, GREEN);
+    DrawText("planet 1", pos1.x, pos1.y - 70, 18.0f, RED);
+    DrawText("planet 2", pos2.x, pos2.y - 70, 18.0f, GREEN);
     EndMode2D();
     // Render the Nuklear GUI
     DrawNuklear(ctx);
