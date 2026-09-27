@@ -94,7 +94,7 @@ elif platform == 'rgfw'
     dependencies += dependency('appleframeworks', modules : ['Cocoa', 'CoreVideo', 'OpenGL', 'IOKit'])
   elif host_machine.system() == 'windows'
     dependencies += dependency('opengl', required : true)
-    dependencies += dependency('gdi32', required : true)
+    dependencies += dependency('gdi32', required : false)
   elif host_machine.system() == 'linux'
     dependencies += dependency('x11', required : true)
     dependencies += dependency('xrandr', required : true)
