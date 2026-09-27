@@ -1,0 +1,52 @@
+# --- platform / graphics --------------------------------------------------
+# 'desktop' (GLFW) removed along with src/external/glfw — rgfw is now the
+# only desktop backend.
+option('platform', type : 'combo',
+  choices : ['rgfw', 'web', 'android', 'drm', 'sdl'],
+  value : 'rgfw',
+  description : 'Target platform (mirrors CMakeOptions.txt PLATFORM)')
+
+option('graphics', type : 'combo',
+  choices : ['default', 'opengl33', 'opengl43', 'opengles2', 'opengles3', 'software'],
+  value : 'default',
+  description : 'Graphics API (mirrors CMakeOptions.txt OPENGL_VERSION)')
+
+# --- general -----------------------------------------------------------
+option('build_examples', type : 'boolean', value : true,
+  description : 'Build examples/ when raylib is the top-level project (ignored as a subproject)')
+option('use_audio', type : 'boolean', value : true,
+  description : 'Build raylib with the audio module')
+option('include_everything', type : 'boolean', value : false,
+  description : 'Force-enable every optional file format regardless of the individual toggles below (CI usage)')
+
+#   WITH_PIC                 -> meson setup builddir -Db_staticpic=true
+#   ENABLE_ASAN               -> meson setup builddir -Db_sanitize=address
+#   ENABLE_UBSAN               -> meson setup builddir -Db_sanitize=undefined
+#   ENABLE_MSAN                -> meson setup builddir -Db_sanitize=memory
+#   BUILD_SHARED_LIBS           -> meson setup builddir -Ddefault_library=shared
+#   CUSTOMIZE_BUILD               -> not needed; every option here is always
+#                                    settable, there's no separate "advanced" gate
+
+option('support_module_rshapes', type : 'boolean', value : true, description : 'Support module rshapes')
+option('support_module_rtextures', type : 'boolean', value : true, description : 'Support module rtextures')
+option('support_module_rtext', type : 'boolean', value : true, description : 'Support module rtext')
+option('support_module_rmodels', type : 'boolean', value : true, description : 'Support module rmodels')
+option('support_module_raudio', type : 'boolean', value : true, description : 'Support module raudio')
+
+option('support_tracelog', type : 'boolean', value : true, description : 'Support tracelog')
+option('support_camera_system', type : 'boolean', value : true, description : 'Support camera system')
+option('support_gestures_system', type : 'boolean', value : true, description : 'Support gestures system')
+option('support_compression_api', type : 'boolean', value : true, description : 'Support compression API')
+option('support_automation_events', type : 'boolean', value : true, description : 'Support automation events')
+
+option('support_fileformat_tga', type : 'boolean', value : false, description : 'Support TGA format')
+option('support_fileformat_jpg', type : 'boolean', value : false, description : 'Support JPG format')
+option('support_fileformat_bmp', type : 'boolean', value : true, description : 'Support BMP format')
+option('support_fileformat_hdr', type : 'boolean', value : false, description : 'Support HDR format')
+option('support_fileformat_ktx', type : 'boolean', value : false, description : 'Support KTX format')
+option('support_fileformat_astc', type : 'boolean', value : false, description : 'Support ASTC format')
+option('support_fileformat_pvr', type : 'boolean', value : false, description : 'Support PVR format')
+option('support_fileformat_obj', type : 'boolean', value : true, description : 'Support OBJ format')
+option('support_fileformat_gltf', type : 'boolean', value : true, description : 'Support GLTF format')
+option('support_fileformat_vox', type : 'boolean', value : true, description : 'Support VOX format')
+option('support_fileformat_flac', type : 'boolean', value : false, description : 'Support FLAC format')
