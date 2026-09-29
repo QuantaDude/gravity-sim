@@ -26,9 +26,7 @@ int main() {
   Vector2 vel1 = {-1.5f, 0.0f};
   Vector2 vel2 = {0.0f, -2.5f};
 
-  Vector2 F21 = {0, 0};
-
-  // SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(1920, 1080, "raylib-nuklear example");
 
   Camera2D camera = {.zoom = 1.0f,
@@ -66,6 +64,13 @@ int main() {
     pos2 = Vector2Add(pos2, Vector2Scale(vel2, dt * timeScale));
     pos1 = Vector2Add(pos1, Vector2Scale(vel1, dt * timeScale));
     // sprintf(FPSstring, "%d\0", GetFPS());
+    //
+    if(IsMouseButtonDown(MOUSE_LEFT_BUTTON)){
+        Vector2 delta = Vector2Scale( GetMouseDelta(), -1.0f);
+
+        camera.target = Vector2Add(camera.target, delta);
+
+    }
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
       Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), camera);
@@ -81,11 +86,12 @@ int main() {
 
     // Nuklear GUI Code
     // https://github.com/Immediate-Mode-UI/Nuklear/wiki/Window
-    if (nk_begin(ctx, "Nuklear", nk_rect(0, 0, 280, 1080),
+    if (nk_begin(ctx, "Nuklear", nk_rect(0, 0, 320, 1080),
                  NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_CLOSABLE)) {
       nk_layout_row_static(ctx, 50, 280, 1);
       nk_label(ctx, "Time Scale", NK_TEXT_CENTERED);
-      timeScale = nk_slide_float(ctx, 0.01f, timeScale, 200.0f, 5.0f);
+     // timeScale = nk_slide_float(ctx, 0.01f, timeScale, 200.0f, 5.0f);
+      nk_property_float(ctx, "Time scale", 0.1f, &timeScale, 200.0f, 0.5f, 1.0f);
       nk_property_float(ctx, "planet 1 mass", 0.00001f, &mass1, 100000000000.0f,
                         0.5f, 1.0f);
       nk_property_float(ctx, "planet 2 mass", 0.00001f, &mass2, 100000000000.0f,
