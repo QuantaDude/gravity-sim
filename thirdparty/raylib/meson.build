@@ -221,6 +221,8 @@ if build_shared_libs
     version : meson.project_version(),
     soversion : api_version,
     install : true,
+#    install_rpath: join_paths(get_option('prefix'), get_option('libdir')),
+    install_dir: meson.global_source_root()+'/' + host_machine.system() + '_' + host_machine.cpu(),
   )
 else
   raylib_lib = static_library('raylib',
@@ -230,6 +232,8 @@ else
     include_directories : include_dirs,
     c_args : all_c_args,
     install : true,
+    #install_rpath: join_paths(get_option('prefix'), get_option('libdir'))
+    install_dir: meson.global_source_root()+'/' + host_machine.system() + '_' + host_machine.cpu(),
   )
 endif
 
@@ -241,7 +245,7 @@ raylib_dep = declare_dependency(
   link_with : raylib_lib,
 )
 
-install_headers(raylib_public_headers, subdir : 'raylib')
+install_headers(raylib_public_headers, install_dir: meson.global_source_root()+'/' + host_machine.system() + '_' + host_machine.cpu()+'/include')
 
 pkg = import('pkgconfig')
 pkg.generate(raylib_lib,

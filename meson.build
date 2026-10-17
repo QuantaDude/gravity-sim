@@ -1,15 +1,15 @@
 project(
   'gravity-sim',
   'c',
-  version : '0.1.0',
-  license : 'MIT',
-  default_options : [
+  version: '0.1.0',
+  license: 'MIT',
+  default_options: [
     'c_std=c17',
-    'b_vscrt=static_from_buildtype',  # MSVC: /MT on release-ish buildtypes, /MTd on debug
+    'b_vscrt=static_from_buildtype', # MSVC: /MT on release-ish buildtypes, /MTd on debug
     'warning_level=2',
   ],
+  subproject_dir: 'thirdparty',
 )
-
 cc = meson.get_compiler('c')
 
 # ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ if cc.get_id() == 'msvc'
 else
   simd_flags += cc.get_supported_arguments('-mavx2', '-mfma')
 endif
-add_project_arguments(simd_flags, language : 'c')
+add_project_arguments(simd_flags, language: 'c')
 
 # ---------------------------------------------------------------------------
 # Debug/Release optimization flags
@@ -44,13 +44,13 @@ add_project_arguments(simd_flags, language : 'c')
 # ---------------------------------------------------------------------------
 # raylib
 #
-raylib_proj = subproject('raylib', default_options : ['default_library=static'])
-raylib_dep  = raylib_proj.get_variable('raylib_dep')
+raylib_proj = subproject('raylib', default_options: ['default_library=static'])
+raylib_dep = raylib_proj.get_variable('raylib_dep')
 # ---------------------------------------------------------------------------
 # nuklear + raylib-nuklear
 #
 raylib_nuklear_proj = subproject('raylib-nuklear')
-raylib_nuklear_dep  = raylib_nuklear_proj.get_variable('raylib_nuklear_dep')
+raylib_nuklear_dep = raylib_nuklear_proj.get_variable('raylib_nuklear_dep')
 # OR:
 # Both are single-header libraries, so they don't need building — just to be
 # on the include path.
@@ -77,6 +77,22 @@ executable(
   'gravity-sim',
   sources,
   #include_directories : nuklear_inc,
-  dependencies : [raylib_dep, raylib_nuklear_dep, cc.find_library('m', required : false)],
-  install : true,
+  dependencies: [raylib_dep, raylib_nuklear_dep, cc.find_library('m', required: false)],
+  install: true,
+  install_dir: meson.current_source_dir()
+  + '/'
+  + host_machine.system()
+  + '_'
+  + host_machine.cpu(),
+)
+
+install_symlink(
+  'shaders',
+  install_dir: meson.current_source_dir()
+  + '/'
+  + host_machine.system()
+  + '_'
+  + host_machine.cpu()
+  + '/',
+  pointing_to: meson.current_source_dir() + '/src/shaders/',
 )

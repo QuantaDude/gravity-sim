@@ -12,4 +12,5 @@ raylib_nuklear_dep = declare_dependency(
 install_headers(
   'raylib-nuklear.h',
   'nuklear.h',
+  install_dir: meson.global_source_root()+'/' + host_machine.system() + '_' + host_machine.cpu()+'/include'
 )

@@ -1,3 +1,0 @@
-# third-party code, don't format
-src/libutil/stb_sprintf.h
-# machine generated code, don't format

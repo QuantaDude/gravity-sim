@@ -1,13 +1,17 @@
 #include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define RAYLIB_NUKLEAR_IMPLEMENTATION
 #include <raylib-nuklear.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
 
-#define MAX_SPLINE_POINTS      320000
+#define MAX_SPLINE_POINTS 320000
 
 typedef struct {
     double x;
@@ -15,10 +19,15 @@ typedef struct {
 } Vec2;
 
 typedef struct {
+    char* name;
     Vec2 pos;
     double mass;
     Vec2 velocity;  // 10^0 = 1m/s
     double radius;  // 10^0 = 1 meter
+
+    Vec2 curvePoints[MAX_SPLINE_POINTS];
+    int trailHead;
+    int trailCount;
 } Object;
 
 Vec2
@@ -57,7 +66,7 @@ Vec2Distance(Vec2 v1, Vec2 v2)
     return result;
 }
 
-//Calc the magnitude
+// Calc the magnitude
 double
 Vec2Length(Vec2 v)
 {
@@ -84,35 +93,69 @@ ToRenderPos(Vec2 pos, Vec2 origin)
 
 Object
 makeObject(double mass, double radius, double velx, double vely, double posx,
-           double posy)
+           double posy, const char* name)
 {
-    Object obj = { .mass     = mass,
-                   .pos      = { .x = posx, .y = posy },
-                   .radius   = radius,
-                   .velocity = { .x = velx, .y = vely } };
+    Object obj = { .mass        = mass,
+                   .pos         = { .x = posx, .y = posy },
+                   .radius      = radius,
+                   .velocity    = { .x = velx, .y = vely },
+                   .trailHead   = 0,
+                   .trailCount  = 0,
+                   .curvePoints = {} };
+
+    obj.name = malloc(sizeof(name));
+    strcpy(obj.name, name);
 
     return obj;
 }
+void
+initObject(Object* obj, double mass, double radius, double velx, double vely,
+           double posx, double posy, const char* name)
+{
+    obj->pos        = (Vec2) { posx, posy };
+    obj->mass       = mass;
+    obj->velocity   = (Vec2) { velx, vely };
+    obj->radius     = radius;
+    obj->trailHead  = 0;
+    obj->trailCount = 0;
 
+    obj->name = calloc(strlen(name), sizeof(char));
+    strcpy(obj->name, name);
+}
 int
 main()
 {
     Vec2 worldSpace = { .x = 0.0, .y = 0.0 };
     const double G  = 6.6743e-11;
 
-    Vec2 curvePoints[MAX_SPLINE_POINTS];
-    int trailHead  = 0;
-    int trailCount = 0;
 
-    Object bodies[3];
+
+    Object* bodies = calloc(6, sizeof(Object));
+
+    if (!bodies) {
+        fprintf(stderr, "Failed to allocate bodies\n");
+        return 1;
+    };
 
     // bodies[0] = makeObject(5.9722e24, 6.371e6, -2.9785e4, 0.0, 0.0, 0.0);
     // bodies[1] = makeObject(7.3470e22, 1.740e6, -1.022e3, 0.0, 0.0, 3.844e8);
     // bodies[2] = makeObject(1.98892e30, 6.957e8, -2.30e5, 0.0, 0.0,
     //                        1.495978707e11);
-    bodies[0] = makeObject(5.9722e24, 6.371e6, -2.9785e3, 0.0, 0.0, 0.0);
-    bodies[1] = makeObject(7.3470e22, 1.740e6, -1.022e3, 0.0, 0.0, 3.844e8);
-    bodies[2] = makeObject(1.98892e30, 6.957e8, 0.0, 0.0, 0.0, 1.495978707e11);
+    initObject(&bodies[0], 5.9722e24, 6.371e6, -2.9785e4, 0.0, 0.0, 0.0,
+               "Earth");
+
+    initObject(&bodies[1], 7.3470e22, 1.740e6, -1.022e5, 0.0, 0.0, 3.844e8,
+               "Moon");
+
+    initObject(&bodies[2], 1.98892e30, 6.957e8, 1.022e4, -1.021321e4, 0.0,
+               8.495978707e10, "Sun 1");
+
+    initObject(&bodies[3], 1.898e27, 7.1492e7, -1.306e4, 0.0, 0.0, -7.78e11,
+               "Jupiter 1");
+    initObject(&bodies[4], 1.898e27, 7.1492e7, -1.306e4, 0.0, 0.0, -7.78e9,
+               "Jupiter 2");
+    initObject(&bodies[5], 1.98892e31, 6.957e9, 0.0, 0.0, 0.0, -1.795978707e11,
+               "Mega Sun");
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
     InitWindow(1920, 1080, "N-body gravity sim");
@@ -127,13 +170,26 @@ main()
 
     SetTargetFPS(60);
     // char *FPSstring = NULL;
-    double timeScale = 0.1;
-
+    uint32_t selected_obj = 0;
+    double timeScale      = 0.1;
+    float time            = (float)GetTime();
+    Shader planetShader   = LoadShader(0, "./shaders/planet_1.glsl");
+    int centerLoc         = GetShaderLocation(planetShader, "uCircleCenter");
+    int radiusLoc         = GetShaderLocation(planetShader, "uCircleRadius");
+    int seedLoc           = GetShaderLocation(planetShader, "u_seed");
+    int seed              = 1337;
+    SetShaderValue(planetShader, seedLoc, &seed, SHADER_UNIFORM_UINT);
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
-        for (size_t i = 0; i < sizeof(bodies) / sizeof(Object); i++) {
+        time     = (float)(time + (dt * timeScale));
+        SetShaderValue(planetShader, GetShaderLocation(planetShader, "uTime"),
+                       &time, SHADER_UNIFORM_FLOAT);
+
+
+
+        for (size_t i = 0; i < 6; i++) {
             Vec2 cumulativeForce = { .x = 0, .y = 0 };
-            for (size_t j = 0; j < sizeof(bodies) / sizeof(Object); j++) {
+            for (size_t j = 0; j < 6; j++) {
                 if (i == j)
                     continue;
                 Vec2 displacement = Vec2Sub(bodies[i].pos, bodies[j].pos);
@@ -152,14 +208,12 @@ main()
 
             bodies[i].pos = Vec2Add(bodies[i].pos, Vec2Scale(bodies[i].velocity,
                                                              dt * timeScale));
-            if (i == 0) {
-                curvePoints[trailHead] = bodies[i].pos;
+            bodies[i].curvePoints[bodies[i].trailHead] = bodies[i].pos;
 
-                trailHead = (trailHead + 1) % MAX_SPLINE_POINTS;
+            bodies[i].trailHead = (bodies[i].trailHead + 1) % MAX_SPLINE_POINTS;
 
-                if (trailCount < MAX_SPLINE_POINTS)
-                    trailCount++;
-            }
+            if (bodies[i].trailCount < MAX_SPLINE_POINTS)
+                bodies[i].trailCount++;
         }
         // delta
         // Vec2 displacementVect      = Vec2Sub(pos1, pos2);
@@ -197,7 +251,7 @@ main()
             camera.target.y = worldSpace.y;
         }
         if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
-            worldSpace = bodies[0].pos;
+            worldSpace = bodies[selected_obj].pos;
         }
         float wheel = GetMouseWheelMove();
         if (wheel != 0) {
@@ -215,7 +269,7 @@ main()
         }
         UpdateNuklear(ctx);
 
-        if (nk_begin(ctx, "Nuklear", nk_rect(0, 0, 420, GetScreenHeight()),
+        if (nk_begin(ctx, "Gravity-sim", nk_rect(0, 0, 420, GetScreenHeight()),
                      NK_WINDOW_BORDER | NK_WINDOW_MOVABLE
                          | NK_WINDOW_CLOSABLE)) {
             nk_layout_row_static(ctx, 50, 400, 1);
@@ -225,23 +279,25 @@ main()
                                0.5, 1.0);
             char velocity_str[54];
             char distance_sun[64];
-            sprintf(velocity_str, "Earth's velocity: %f m/s",
-                    Vec2Length(bodies[0].velocity));
-            sprintf(distance_sun, "Earth's distance to sun: %f km",
-                    Vec2Distance(bodies[0].pos, bodies[2].pos) * 1000);
+            sprintf(velocity_str, "%s's velocity: %f m/s",
+                    bodies[selected_obj].name,
+                    Vec2Length(bodies[selected_obj].velocity));
+            sprintf(distance_sun, "Earth's distance to %s: %f km",
+                    bodies[selected_obj].name,
+                    Vec2Distance(bodies[0].pos, bodies[selected_obj].pos)
+                        * 1000);
             nk_label(ctx, velocity_str, NK_TEXT_ALIGN_LEFT);
             nk_label(ctx, distance_sun, NK_TEXT_ALIGN_LEFT);
             // nk_property_double(ctx, "planet 1 mass", DBL_MIN, &mass1, DBL_MAX,
             //                    0.5, 1.0);
             // nk_property_double(ctx, "planet 2 mass", DBL_MIN, &mass2, DBL_MAX,
             //                    0.5, 1.0);
-            if (nk_button_label(ctx, "Button")) {
-                // Button was clicked!
+            if (nk_button_label(ctx, "go to body")) {
+                worldSpace = bodies[selected_obj].pos;
             }
         }
         nk_end(ctx);
 
-        // Render
         BeginDrawing();
         ClearBackground(BLACK);
 
@@ -252,21 +308,49 @@ main()
         DrawGrid(10000 * camera.zoom, 50 * (1.0f / camera.zoom));
 
         rlPopMatrix();
-        for (size_t i = 0; i < (sizeof(bodies) / sizeof(Object)); i++) {
+        Vector2 res = { (float)GetScreenWidth(), (float)GetScreenHeight() };
+
+        for (size_t i = 0; i < 6; i++) {
+            Vector2 renderPos = ToRenderPos(bodies[i].pos, worldSpace);
+            Vector2 screenPos = GetWorldToScreen2D(renderPos, camera);
+            Vector2 center    = { screenPos.x, res.y - screenPos.y };
+            float radius      = (float)bodies[i].radius * camera.zoom;
+
+            SetShaderValue(planetShader, centerLoc, &center,
+                           SHADER_UNIFORM_VEC2);
+            SetShaderValue(planetShader, radiusLoc, &radius,
+                           SHADER_UNIFORM_FLOAT);
+            BeginShaderMode(planetShader);
             DrawCircleV(ToRenderPos(bodies[i].pos, worldSpace),
                         bodies[i].radius, YELLOW);
+            EndShaderMode();
+
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                if (CheckCollisionPointCircle(
+                        GetScreenToWorld2D(GetMousePosition(), camera),
+                        renderPos, bodies[i].radius)) {
+                    selected_obj = i;
+                }
+            }
         }
         // DrawLineBezier(ToRenderPos(initial, worldSpace),
         //                ToRenderPos(pos1, worldSpace), 9000.0f, RED);
-        for (int i = 1; i < trailCount; i++) {
-            int prev = (trailHead - trailCount + i - 1 + MAX_SPLINE_POINTS)
-                       % MAX_SPLINE_POINTS;
+        for (int body = 0; body < 6; body++) {
+            for (int i = 1; i < bodies[body].trailCount; i++) {
+                int prev = (bodies[body].trailHead - bodies[body].trailCount + i
+                            - 1 + MAX_SPLINE_POINTS)
+                           % MAX_SPLINE_POINTS;
 
-            int curr = (trailHead - trailCount + i + MAX_SPLINE_POINTS)
-                       % MAX_SPLINE_POINTS;
+                int curr = (bodies[body].trailHead - bodies[body].trailCount + i
+                            + MAX_SPLINE_POINTS)
+                           % MAX_SPLINE_POINTS;
 
-            DrawLineV(ToRenderPos(curvePoints[prev], worldSpace),
-                      ToRenderPos(curvePoints[curr], worldSpace), WHITE);
+                DrawLineV(ToRenderPos(bodies[body].curvePoints[prev],
+                                      worldSpace),
+                          ToRenderPos(bodies[body].curvePoints[curr],
+                                      worldSpace),
+                          WHITE);
+            }
         }
         // DrawText("Earth", pos1.x - worldSpace.x - 1000.0f,
         //          (pos1.y - worldSpace.y), 18.0f * (1.0 / camera.zoom), YELLOW);
@@ -285,5 +369,6 @@ main()
     UnloadNuklear(ctx);
 
     CloseWindow();
+    free(bodies);
     return 0;
 }

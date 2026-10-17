@@ -1,0 +1,56 @@
+# CMakeOptions.txt — raylib build options
+# (Meson equivalent: meson_options.txt)
+#
+# Meson built-ins that had no custom option are plain CMake options again:
+#   BUILD_SHARED_LIBS  <-  -Ddefault_library=shared
+#   WITH_PIC           <-  -Db_staticpic=true
+#   ENABLE_ASAN        <-  -Db_sanitize=address
+#   ENABLE_UBSAN       <-  -Db_sanitize=undefined
+#   ENABLE_MSAN        <-  -Db_sanitize=memory   (can't combine with ASAN)
+
+# --- platform / graphics ----------------------------------------------------
+# 'Desktop' (GLFW) was removed along with src/external/glfw — RGFW is now the
+# only desktop backend.
+set(PLATFORM "RGFW" CACHE STRING "Target platform")
+set_property(CACHE PLATFORM PROPERTY STRINGS RGFW Web Android DRM SDL)
+
+set(OPENGL_VERSION "OFF" CACHE STRING "Graphics API (OFF = platform default)")
+set_property(CACHE OPENGL_VERSION PROPERTY STRINGS OFF "3.3" "4.3" "ES 2.0" "ES 3.0")
+
+# --- general ----------------------------------------------------------------
+option(BUILD_EXAMPLES      "Build examples/ when raylib is the top-level project (ignored as a subproject)" ON)
+option(USE_AUDIO           "Build raylib with the audio module" ON)
+option(INCLUDE_EVERYTHING  "Force-enable every optional file format regardless of the individual toggles below (CI usage)" OFF)
+option(BUILD_SHARED_LIBS   "Build raylib as a shared library" OFF)
+option(WITH_PIC            "Compile the static library as position-independent code" OFF)
+option(ENABLE_ASAN         "Build with AddressSanitizer" OFF)
+option(ENABLE_UBSAN        "Build with UndefinedBehaviorSanitizer" OFF)
+option(ENABLE_MSAN         "Build with MemorySanitizer (can't be combined with ENABLE_ASAN)" OFF)
+
+# --- modules / optional features --------------------------------------------
+# The known SUPPORT_* flag set is listed explicitly. If raylib's config.h grows
+# a new SUPPORT_* flag, add an option() here AND an entry to the matching
+# foreach() list in CMakeLists.txt.
+option(SUPPORT_MODULE_RSHAPES    "Support module rshapes"    ON)
+option(SUPPORT_MODULE_RTEXTURES  "Support module rtextures"  ON)
+option(SUPPORT_MODULE_RTEXT      "Support module rtext"      ON)
+option(SUPPORT_MODULE_RMODELS    "Support module rmodels"    ON)
+option(SUPPORT_MODULE_RAUDIO     "Support module raudio"     ON)
+
+option(SUPPORT_TRACELOG          "Support tracelog"          ON)
+option(SUPPORT_CAMERA_SYSTEM     "Support camera system"     ON)
+option(SUPPORT_GESTURES_SYSTEM   "Support gestures system"   ON)
+option(SUPPORT_COMPRESSION_API   "Support compression API"   ON)
+option(SUPPORT_AUTOMATION_EVENTS "Support automation events" ON)
+
+option(SUPPORT_FILEFORMAT_TGA    "Support TGA format"        OFF)
+option(SUPPORT_FILEFORMAT_JPG    "Support JPG format"        OFF)
+option(SUPPORT_FILEFORMAT_BMP    "Support BMP format"        ON)
+option(SUPPORT_FILEFORMAT_HDR    "Support HDR format"        OFF)
+option(SUPPORT_FILEFORMAT_KTX    "Support KTX format"        OFF)
+option(SUPPORT_FILEFORMAT_ASTC   "Support ASTC format"       OFF)
+option(SUPPORT_FILEFORMAT_PVR    "Support PVR format"        OFF)
+option(SUPPORT_FILEFORMAT_OBJ    "Support OBJ format"        ON)
+option(SUPPORT_FILEFORMAT_GLTF   "Support GLTF format"       ON)
+option(SUPPORT_FILEFORMAT_VOX    "Support VOX format"        ON)
+option(SUPPORT_FILEFORMAT_FLAC   "Support FLAC format"       OFF)
