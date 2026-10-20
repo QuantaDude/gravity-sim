@@ -11,7 +11,10 @@
 #include <raymath.h>
 #include <rlgl.h>
 
-#define MAX_SPLINE_POINTS 320000
+#define ARENA_IMPLEMENTATION
+#include "mem_arena.h"
+
+#define MAX_SPLINE_POINTS 1000
 
 typedef struct {
     double x;
@@ -30,6 +33,7 @@ typedef struct {
     int trailCount;
 } Object;
 
+#pragma region helpers
 Vec2
 Vec2Scale(Vec2 v, double scale)
 {
@@ -122,25 +126,43 @@ initObject(Object* obj, double mass, double radius, double velx, double vely,
     obj->name = calloc(strlen(name), sizeof(char));
     strcpy(obj->name, name);
 }
+#pragma endregion
+
+typedef struct {
+    Shader planet_shader;
+    struct nk_context* ctx;
+    Vec2 worldSpace;
+    double time_scale;
+    float time;
+    Object* bodies;
+
+} App;
+
 int
 main()
 {
-    Vec2 worldSpace = { .x = 0.0, .y = 0.0 };
-    const double G  = 6.6743e-11;
+#pragma region init
+    void* mem = malloc(289152);
+    Arena a   = { 0 };
+    arena_init(&a, mem, 289152);
+    App* sim              = (App*)arena_alloc(&a, sizeof(App));
+    sim->worldSpace.x     = 0.0;
+    sim->worldSpace.y     = 0.0;
+    sim->time_scale       = 0.1;
+    sim->time             = (float)GetTime();
+    uint32_t selected_obj = 0;
+    const double G        = 6.6743e-11;
 
+    float* time       = &sim->time;
+    double* timeScale = &sim->time_scale;
 
-
+#pragma region alloc_init_inital_bodies
     Object* bodies = calloc(6, sizeof(Object));
-
     if (!bodies) {
         fprintf(stderr, "Failed to allocate bodies\n");
         return 1;
-    };
+    }
 
-    // bodies[0] = makeObject(5.9722e24, 6.371e6, -2.9785e4, 0.0, 0.0, 0.0);
-    // bodies[1] = makeObject(7.3470e22, 1.740e6, -1.022e3, 0.0, 0.0, 3.844e8);
-    // bodies[2] = makeObject(1.98892e30, 6.957e8, -2.30e5, 0.0, 0.0,
-    //                        1.495978707e11);
     initObject(&bodies[0], 5.9722e24, 6.371e6, -2.9785e4, 0.0, 0.0, 0.0,
                "Earth");
 
@@ -156,37 +178,41 @@ main()
                "Jupiter 2");
     initObject(&bodies[5], 1.98892e31, 6.957e9, 0.0, 0.0, 0.0, -1.795978707e11,
                "Mega Sun");
+#pragma endregion
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
     InitWindow(1920, 1080, "N-body gravity sim");
+    SetTargetFPS(60);
 
     Camera2D camera = { .zoom     = 1.0f,
                         .offset   = { .x = 0.0f, .y = 0.0f },
                         .rotation = 0.0f,
                         .target   = { .x = 0.0f, .y = 0.0f } };
+
     // Create the Nuklear Context
     int fontSize           = 18;
     struct nk_context* ctx = InitNuklear(fontSize);
 
-    SetTargetFPS(60);
-    // char *FPSstring = NULL;
-    uint32_t selected_obj = 0;
-    double timeScale      = 0.1;
-    float time            = (float)GetTime();
-    Shader planetShader   = LoadShader(0, "./shaders/planet_1.glsl");
-    int centerLoc         = GetShaderLocation(planetShader, "uCircleCenter");
-    int radiusLoc         = GetShaderLocation(planetShader, "uCircleRadius");
-    int seedLoc           = GetShaderLocation(planetShader, "u_seed");
-    int seed              = 1337;
+#pragma region setup_shaders
+    Shader planetShader = LoadShader(0, "./shaders/planet_1.glsl");
+    int centerLoc       = GetShaderLocation(planetShader, "uCircleCenter");
+    int radiusLoc       = GetShaderLocation(planetShader, "uCircleRadius");
+    int seedLoc         = GetShaderLocation(planetShader, "u_seed");
+    int seed            = 1337;
     SetShaderValue(planetShader, seedLoc, &seed, SHADER_UNIFORM_UINT);
+#pragma endregion
+
+#pragma endregion init
+
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
-        time     = (float)(time + (dt * timeScale));
+        *time    = (float)(*time + (dt * *timeScale));
         SetShaderValue(planetShader, GetShaderLocation(planetShader, "uTime"),
-                       &time, SHADER_UNIFORM_FLOAT);
+                       time, SHADER_UNIFORM_FLOAT);
 
 
 
+#pragma region calc_forces_and_curve_points
         for (size_t i = 0; i < 6; i++) {
             Vec2 cumulativeForce = { .x = 0, .y = 0 };
             for (size_t j = 0; j < 6; j++) {
@@ -204,10 +230,10 @@ main()
             }
             Vec2 acc_i = Vec2Scale(cumulativeForce, 1.0 / bodies[i].mass);
             bodies[i].velocity = Vec2Add(bodies[i].velocity,
-                                         Vec2Scale(acc_i, dt * timeScale));
+                                         Vec2Scale(acc_i, dt * *timeScale));
 
             bodies[i].pos = Vec2Add(bodies[i].pos, Vec2Scale(bodies[i].velocity,
-                                                             dt * timeScale));
+                                                             dt * *timeScale));
             bodies[i].curvePoints[bodies[i].trailHead] = bodies[i].pos;
 
             bodies[i].trailHead = (bodies[i].trailHead + 1) % MAX_SPLINE_POINTS;
@@ -215,6 +241,8 @@ main()
             if (bodies[i].trailCount < MAX_SPLINE_POINTS)
                 bodies[i].trailCount++;
         }
+#pragma endregion
+#pragma region old_gravity_code
         // delta
         // Vec2 displacementVect      = Vec2Sub(pos1, pos2);
         // double displaceMagnitudeSq = Vec2LengthSqr(displacementVect);
@@ -242,16 +270,17 @@ main()
         //
         // if (trailCount < MAX_SPLINE_POINTS)
         //     trailCount++;
-
+#pragma endregion
+#pragma region camera_controls
         if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
             Vec2 delta = Vec2ScaleF(GetMouseDelta(), -1.0 / camera.zoom);
 
-            worldSpace      = Vec2Add(worldSpace, delta);
-            camera.target.x = worldSpace.x;
-            camera.target.y = worldSpace.y;
+            sim->worldSpace = Vec2Add(sim->worldSpace, delta);
+            camera.target.x = sim->worldSpace.x;
+            camera.target.y = sim->worldSpace.y;
         }
         if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
-            worldSpace = bodies[selected_obj].pos;
+            sim->worldSpace = bodies[selected_obj].pos;
         }
         float wheel = GetMouseWheelMove();
         if (wheel != 0) {
@@ -259,14 +288,16 @@ main()
                                                        camera);
             camera.offset         = GetMousePosition();
 
-            worldSpace.x  = mouseWorldPos.x;
-            worldSpace.y  = mouseWorldPos.y;
-            camera.target = mouseWorldPos;
+            sim->worldSpace.x = mouseWorldPos.x;
+            sim->worldSpace.y = mouseWorldPos.y;
+            camera.target     = mouseWorldPos;
 
             float scale = 0.2f * wheel;
             camera.zoom = Clamp(expf(logf(camera.zoom) + scale), 0.000000000005,
                                 64.0f);
         }
+#pragma endregion
+#pragma region draw_ui
         UpdateNuklear(ctx);
 
         if (nk_begin(ctx, "Gravity-sim", nk_rect(0, 0, 420, GetScreenHeight()),
@@ -275,7 +306,7 @@ main()
             nk_layout_row_static(ctx, 50, 400, 1);
             nk_label(ctx, "Time Scale", NK_TEXT_CENTERED);
             // timeScale = nk_slide_float(ctx, 0.01f, timeScale, 200.0f, 5.0f);
-            nk_property_double(ctx, "Time scale", 0.0001, &timeScale, DBL_MAX,
+            nk_property_double(ctx, "Time scale", 0.0001, timeScale, DBL_MAX,
                                0.5, 1.0);
             char velocity_str[54];
             char distance_sun[64];
@@ -293,11 +324,11 @@ main()
             // nk_property_double(ctx, "planet 2 mass", DBL_MIN, &mass2, DBL_MAX,
             //                    0.5, 1.0);
             if (nk_button_label(ctx, "go to body")) {
-                worldSpace = bodies[selected_obj].pos;
+                sim->worldSpace = bodies[selected_obj].pos;
             }
         }
         nk_end(ctx);
-
+#pragma endregion
         BeginDrawing();
         ClearBackground(BLACK);
 
@@ -311,7 +342,7 @@ main()
         Vector2 res = { (float)GetScreenWidth(), (float)GetScreenHeight() };
 
         for (size_t i = 0; i < 6; i++) {
-            Vector2 renderPos = ToRenderPos(bodies[i].pos, worldSpace);
+            Vector2 renderPos = ToRenderPos(bodies[i].pos, sim->worldSpace);
             Vector2 screenPos = GetWorldToScreen2D(renderPos, camera);
             Vector2 center    = { screenPos.x, res.y - screenPos.y };
             float radius      = (float)bodies[i].radius * camera.zoom;
@@ -321,7 +352,7 @@ main()
             SetShaderValue(planetShader, radiusLoc, &radius,
                            SHADER_UNIFORM_FLOAT);
             BeginShaderMode(planetShader);
-            DrawCircleV(ToRenderPos(bodies[i].pos, worldSpace),
+            DrawCircleV(ToRenderPos(bodies[i].pos, sim->worldSpace),
                         bodies[i].radius, YELLOW);
             EndShaderMode();
 
@@ -333,8 +364,7 @@ main()
                 }
             }
         }
-        // DrawLineBezier(ToRenderPos(initial, worldSpace),
-        //                ToRenderPos(pos1, worldSpace), 9000.0f, RED);
+
         for (int body = 0; body < 6; body++) {
             for (int i = 1; i < bodies[body].trailCount; i++) {
                 int prev = (bodies[body].trailHead - bodies[body].trailCount + i
@@ -346,9 +376,9 @@ main()
                            % MAX_SPLINE_POINTS;
 
                 DrawLineV(ToRenderPos(bodies[body].curvePoints[prev],
-                                      worldSpace),
+                                      sim->worldSpace),
                           ToRenderPos(bodies[body].curvePoints[curr],
-                                      worldSpace),
+                                      sim->worldSpace),
                           WHITE);
             }
         }

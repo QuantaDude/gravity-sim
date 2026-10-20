@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -16,15 +17,17 @@ typedef struct {
     size_t prev_offset;
 } Arena;
 
-void* arena_alloc(Arena* arena, size_t size, size_t align = DEFAULT_ALIGNMENT);
+static inline void* arena_alloc(Arena* arena, size_t size);
 
-void* arena_resize_aligned(Arena* arena, void* buffer, size_t curr_size,
+static inline void* arena_alloc_aligned(Arena* arena, size_t size, size_t align);
+
+static inline void arena_resize(Arena* arena, void* buffer, size_t curr_size,
+                                size_t new_size);
+
+static inline void* arena_resize_aligned(Arena* arena, void* buffer, size_t curr_size,
                            size_t new_size, size_t align);
 
-void* arena_resize(Arena* arena, void* buffer, size_t curr_size,
-                   size_t new_size, size_t align = DEFAULT_ALIGNMENT);
-
-void arena_init(Arena* arena, void* buffer, size_t buffer_size);
+static inline void arena_init(Arena* arena, void* buffer, size_t buffer_size);
 
 void arena_reset(Arena* arena);
 void arena_free(Arena* arena);
@@ -49,22 +52,20 @@ void arena_savepoint_restore(ArenaTemp);
 ////////////////////////
 #    ifdef ARENA_IMPLEMENTATION
 
-bool
+inline bool
 arena_is_power_of_two(uintptr_t align)
 {
     return (align & (align - 1)) == 0;
 }
 
-uintptr_t
+inline uintptr_t
 arena_align_forward(uintptr_t ptr, size_t align)
 {
-    uintptr_t p, a, modulo;
-
     assert(arena_is_power_of_two(align));
 
-    p      = ptr;
-    a      = (uintptr_t)align;
-    modulo = p & (a - 1);
+    uintptr_t p = ptr;
+    const uintptr_t a = (uintptr_t)align;
+    const uintptr_t modulo = p & (a - 1);
 
     if (modulo != 0) {
         p += a - modulo;
@@ -76,7 +77,7 @@ arena_align_forward(uintptr_t ptr, size_t align)
 static inline void*
 arena_alloc(Arena* arena, size_t size)
 {
-    arena_alloc_aligned(arena, size, DEFADEFAULT_ALIGNMENT);
+   return arena_alloc_aligned(arena, size, DEFAULT_ALIGNMENT);
 }
 
 static inline void*
@@ -98,16 +99,22 @@ arena_alloc_aligned(Arena* arena, size_t size, size_t align)
     return NULL;
 }
 
-void*
-arena_resize(Arena* arena, void* buffer, size_t curr_size, size_t new_size,
-             size_t align)
+static inline void
+arena_resize(Arena* arena, void* buffer, size_t curr_size, size_t new_size)
+{
+    arena_resize_aligned(arena, buffer, curr_size, new_size, DEFAULT_ALIGNMENT);
+}
+
+static inline void*
+arena_resize_aligned(Arena* arena, void* buffer, size_t curr_size,
+                     size_t new_size, size_t align)
 {
     unsigned char* old_mem = (unsigned char*)buffer;
 
     assert(arena_is_power_of_two(align));
 
     if (old_mem == NULL || curr_size == 0) {
-        return arena_alloc(arena, new_size, align);
+        return arena_alloc_aligned(arena, new_size, align);
 
     } else if (arena->buffer <= old_mem
                && old_mem < arena->buffer + arena->buffer_size) {
@@ -122,7 +129,7 @@ arena_resize(Arena* arena, void* buffer, size_t curr_size, size_t new_size,
             }
             return NULL;
         } else {
-            void* new_buffer = arena_alloc(arena, new_size, align);
+            void* new_buffer = arena_alloc_aligned(arena, new_size, align);
             size_t copy_size = curr_size < new_size ? curr_size : new_size;
 
             memmove(new_buffer, buffer, copy_size);
@@ -134,7 +141,7 @@ arena_resize(Arena* arena, void* buffer, size_t curr_size, size_t new_size,
     }
 }
 
-void
+inline void
 arena_init(Arena* arena, void* buffer, size_t buffer_size)
 {
     arena->buffer      = (unsigned char*)buffer;
@@ -143,13 +150,13 @@ arena_init(Arena* arena, void* buffer, size_t buffer_size)
     arena->prev_offset = 0;
 }
 
-void
+inline void
 arena_reset(Arena* arena)
 {
     arena->offset      = 0;
     arena->prev_offset = 0;
 }
-void
+inline void
 arena_free(Arena* arena)
 {
     arena->offset      = 0;
@@ -160,7 +167,7 @@ arena_free(Arena* arena)
 #        endif  // DEBUG
 }
 
-ArenaTemp
+inline ArenaTemp
 arena_savepoint_create(Arena* arena)
 {
     ArenaTemp temp;
@@ -171,7 +178,7 @@ arena_savepoint_create(Arena* arena)
     return temp;
 }
 
-void
+inline void
 arena_savepoint_restore(ArenaTemp temp_arena)
 {
     temp_arena.arena->offset      = temp_arena.offset;

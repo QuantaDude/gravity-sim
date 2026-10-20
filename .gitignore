@@ -1,4 +1,8 @@
 build/
 .cache/
 compile_commands.json
+cmake-build-debug/
+linux*/
+windows*/
+.clion/
 */.wraplock
